@@ -2,6 +2,7 @@ package operator
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -31,6 +32,8 @@ const (
 	SIN = "sin"
 	COS = "cos"
 	TAN = "tan"
+	ABS = "abs"
+	OPP = "opp" // opposite number
 )
 
 var (
@@ -166,4 +169,51 @@ func (o *bracketOperator) ArgsCount() int {
 
 func (o *bracketOperator) Execute(args []interface{}) (interface{}, error) {
 	panic(fmt.Sprintf("calc/operator: access Execute for bracket opreator: %s", o.code))
+}
+
+type functionOperator struct {
+	*generalOperator
+}
+
+func newFunctionOperator(c string) *functionOperator {
+	return &functionOperator{newGeneralOperator(c)}
+}
+
+func (o *functionOperator) Type() Type {
+	return Function
+}
+
+func (o *functionOperator) ArgsCount() int {
+	return 1
+}
+
+func (o *functionOperator) Execute(args []interface{}) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, fmt.Errorf("calc/operator: invalid param count for code: %s, expected: 1, actual: %d", o.code, len(args))
+	}
+
+	arg1 := args[0]
+	vf1, okf1 := arg1.(float64)
+	floatOpMap := map[string]func(f float64) float64{
+		SIN: math.Sin,
+		COS: math.Cos,
+		TAN: math.Tan,
+		ABS: math.Abs,
+		OPP: func(f float64) float64 { return -f },
+	}
+
+	switch {
+	case okf1 && floatOpMap[o.code] != nil:
+		return floatOpMap[o.code](vf1), nil
+	}
+
+	return nil, fmt.Errorf("calc/operator: invalid arguments for code: %s", o.code)
+}
+
+func (o *functionOperator) Preference() int {
+	if o.code == OPP {
+		return 2
+	}
+
+	return 0
 }

@@ -48,12 +48,15 @@ func (c *Calculator) EvalWithVars(input string, m map[string]float64) (interface
 	fileSet := token.NewFileSet()
 	s.Init(fileSet.AddFile("", fileSet.Base(), len(src)), src, nil, 0)
 
+	var preIsOperator *bool
 	for {
 		_, tok, lit := s.Scan()
 		if tok == token.EOF {
 			break
 		}
+		//fmt.Printf("%s\t%s\n", tok, lit)
 
+		op, isOperator := c.getOperator(tok, lit)
 		switch {
 		case tok == token.FLOAT || tok == token.INT:
 			// is number
@@ -66,20 +69,26 @@ func (c *Calculator) EvalWithVars(input string, m map[string]float64) (interface
 			// is string
 			// remove surrounding double or single quotes
 			c.paramStack.Push(lit[1 : len(lit)-1])
-		case c.opManager.Contains(tok.String()):
+		case isOperator:
 			// is operator
-			op := c.opManager.Get(tok.String())
 			switch op.Type() {
 			case operator.General:
-				if err := c.handleGeneralOperator(op); err != nil {
+				if err := c.handleGeneralOperator(op, preIsOperator); err != nil {
 					return nil, err
 				}
 			case operator.Bracket:
 				if err := c.handleBracketOperator(op); err != nil {
 					return nil, err
 				}
+			case operator.Function:
+				c.operatorStack.Push(op)
 			}
+		case tok == token.SEMICOLON:
+		default:
+			return nil, fmt.Errorf("calc: unsupported token: %s", lit)
 		}
+
+		preIsOperator = &isOperator
 	}
 
 	if err := c.executeAll(); err != nil {
@@ -94,20 +103,21 @@ func (c *Calculator) EvalWithVars(input string, m map[string]float64) (interface
 	return result, nil
 }
 
-func (c *Calculator) handleGeneralOperator(op operator.Operator) error {
+func (c *Calculator) handleGeneralOperator(op operator.Operator, preIsOperator *bool) error {
+	// need handle `-` specially, convert to opposite number function
+	if op.String() == operator.SUB && (preIsOperator == nil || *preIsOperator) {
+		op = c.opManager.Get(operator.OPP)
+	}
+
 	for {
-		preOp, ok := mustOperator(c.operatorStack.Top())
+		ok, err := c.executeLastWithCondition(func(lastOp operator.Operator) (bool, error) {
+			return op.Preference() <= lastOp.Preference(), nil
+		})
+		if err != nil {
+			return err
+		}
 		if !ok {
 			break
-		}
-
-		if op.Preference() > preOp.Preference() {
-			break
-		}
-
-		preOp, _ = mustOperator(c.operatorStack.Pop())
-		if err := c.execute(preOp); err != nil {
-			return err
 		}
 	}
 
@@ -121,26 +131,27 @@ func (c *Calculator) handleBracketOperator(op operator.Operator) error {
 		c.operatorStack.Push(op)
 	case operator.RPAREN:
 		for {
-			preOp, ok := mustOperator(c.operatorStack.Top())
+			ok, err := c.executeLastWithCondition(func(lastOp operator.Operator) (bool, error) {
+				return lastOp.String() != operator.LPAREN, nil
+			})
+			if err != nil {
+				return err
+			}
 			if !ok {
 				break
-			}
-			if preOp.String() == operator.LPAREN {
-				break
-			}
-			if preOp.Type() != operator.General {
-				return errors.New("calc: unexpected operator type")
-			}
-
-			preOp, _ = mustOperator(c.operatorStack.Pop())
-			if err := c.execute(preOp); err != nil {
-				return err
 			}
 		}
 
 		// pop `(`
 		if _, ok := mustOperator(c.operatorStack.Pop()); !ok {
 			return errors.New("calc: can not find matching parenthesis")
+		}
+
+		// calculation if pre operator is function type
+		if _, err := c.executeLastWithCondition(func(lastOp operator.Operator) (bool, error) {
+			return lastOp.Type() == operator.Function, nil
+		}); err != nil {
+			return err
 		}
 	}
 
@@ -179,6 +190,36 @@ func (c *Calculator) execute(op operator.Operator) error {
 
 	c.paramStack.Push(result)
 	return nil
+}
+
+func (c *Calculator) executeLastWithCondition(conditionFunc func(lastOp operator.Operator) (bool, error)) (bool, error) {
+	preOp, ok := mustOperator(c.operatorStack.Top())
+	if !ok {
+		return false, nil
+	}
+	ok, err := conditionFunc(preOp)
+	if !ok || err != nil {
+		return ok, err
+	}
+
+	preOp, _ = mustOperator(c.operatorStack.Pop())
+	if err := c.execute(preOp); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (c *Calculator) getOperator(tok token.Token, lit string) (operator.Operator, bool) {
+	if c.opManager.Contains(tok.String()) || c.opManager.Contains(lit) {
+		op := c.opManager.Get(tok.String())
+		if op == nil {
+			op = c.opManager.Get(lit)
+		}
+		return op, true
+	}
+
+	return nil, false
 }
 
 func mustOperator(r interface{}, ok bool) (operator.Operator, bool) {

@@ -1,6 +1,7 @@
 package calc
 
 import (
+	"math"
 	"reflect"
 	"testing"
 )
@@ -13,6 +14,7 @@ func TestEval(t *testing.T) {
 	}{
 		// general
 		{expressions: "1+2", expected: 3.0},
+		{expressions: "-1+2", expected: 1.0},
 		{expressions: "1,2", expected: []interface{}{1.0, 2.0}},
 		{expressions: "1/3", expected: 1.0 / 3},
 		{expressions: "1+2*3+4", expected: 11.0},
@@ -23,6 +25,10 @@ func TestEval(t *testing.T) {
 		// bracket
 		{expressions: "(1+2)*3+4", expected: 13.0},
 		{expressions: "(1*(2+1))*((3+1)*4)", expected: 48.0},
+
+		// function
+		{expressions: "3*sin(3+2*3)+3*4", expected: 3*math.Sin(3+2*3) + 3*4},
+		{expressions: "abs(-5)", expected: 5.0},
 
 		// error conditions
 		{expressions: "2/0", expectErr: true},

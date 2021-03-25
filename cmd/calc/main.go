@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "github.com/xwjdsh/calc"
 
 func main() {
-	fmt.Println("vim-go")
+	calc.Eval("1+cos(2)")
 }

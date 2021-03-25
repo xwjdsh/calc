@@ -12,9 +12,15 @@ func NewManager() *Manager {
 	for _, c := range []string{ADD, SUB, MUL, QUO, REM, COMMA} {
 		m[c] = newGeneralOperator(c)
 	}
+
 	// register bracket type operators
 	for _, c := range []string{LPAREN, RPAREN} {
 		m[c] = newBracketOperator(c)
+	}
+
+	// register function type operators
+	for _, c := range []string{SIN, COS, TAN, ABS, OPP} {
+		m[c] = newFunctionOperator(c)
 	}
 
 	return &Manager{
