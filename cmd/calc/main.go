@@ -1,7 +1,11 @@
 package main
 
-import "github.com/xwjdsh/calc"
+import (
+	"fmt"
+
+	"github.com/xwjdsh/calc"
+)
 
 func main() {
-	calc.Eval("1+cos(2)")
+	fmt.Println(calc.Eval("sum(2,3,4)"))
 }

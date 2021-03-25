@@ -34,11 +34,15 @@ const (
 	TAN = "tan"
 	ABS = "abs"
 	OPP = "opp" // opposite number
+	SUM = "sum"
+	MAX = "max"
+	MIN = "min"
 )
 
 var (
 	_ Operator = new(generalOperator)
 	_ Operator = new(bracketOperator)
+	_ Operator = new(functionOperator)
 )
 
 // Operator abstract the function of operators.
@@ -139,12 +143,16 @@ func (o *generalOperator) Execute(args []interface{}) (interface{}, error) {
 		if okf1 && okf2 {
 			i1, i2 := int(vf1), int(vf2)
 			if vf1 == float64(i1) && vf2 == float64(i2) {
-				return i1 % i2, nil
+				return float64(i1 % i2), nil
 			}
 		}
 	case COMMA:
-		if (oks1 && oks2) || (okf1 && okf2) {
+		if oks1 || okf1 {
 			return []interface{}{arg1, arg2}, nil
+		}
+		vSli1, okSli1 := arg1.([]interface{})
+		if okSli1 && len(vSli1) > 0 {
+			return append(vSli1, arg2), nil
 		}
 	}
 
@@ -161,6 +169,10 @@ func newBracketOperator(c string) *bracketOperator {
 
 func (o *bracketOperator) Type() Type {
 	return Bracket
+}
+
+func (o *bracketOperator) Preference() int {
+	return -1
 }
 
 func (o *bracketOperator) ArgsCount() int {
@@ -194,17 +206,53 @@ func (o *functionOperator) Execute(args []interface{}) (interface{}, error) {
 
 	arg1 := args[0]
 	vf1, okf1 := arg1.(float64)
+	originalFunc := func(f float64) float64 { return f }
 	floatOpMap := map[string]func(f float64) float64{
 		SIN: math.Sin,
 		COS: math.Cos,
 		TAN: math.Tan,
 		ABS: math.Abs,
 		OPP: func(f float64) float64 { return -f },
+		SUM: originalFunc,
+		MAX: originalFunc,
+		MIN: originalFunc,
 	}
 
-	switch {
-	case okf1 && floatOpMap[o.code] != nil:
+	if okf1 && floatOpMap[o.code] != nil {
 		return floatOpMap[o.code](vf1), nil
+	}
+
+	vSli1, okSli1 := arg1.([]interface{})
+	if okSli1 && len(vSli1) > 0 {
+		switch o.code {
+		case SUM:
+			if sum := 0.0; supposeFloatSlice(vSli1, func(_ int, f float64) { sum += f }) {
+				return sum, nil
+			}
+		case MAX, MIN:
+			eff := func(f1, f2 float64) bool { return f1 > f2 }
+			esf := func(s1, s2 string) bool { return s1 > s2 }
+			if o.code == MIN {
+				eff = func(f1, f2 float64) bool { return f1 < f2 }
+				esf = func(s1, s2 string) bool { return s1 < s2 }
+			}
+
+			if r := 0.0; supposeFloatSlice(vSli1, func(i int, f float64) {
+				if i == 0 || eff(f, r) {
+					r = f
+				}
+			}) {
+				return r, nil
+			}
+
+			if r := ""; supposeStringSlice(vSli1, func(i int, s string) {
+				if i == 0 || esf(s, r) {
+					r = s
+				}
+			}) {
+				return r, nil
+			}
+		}
 	}
 
 	return nil, fmt.Errorf("calc/operator: invalid arguments for code: %s", o.code)
@@ -216,4 +264,28 @@ func (o *functionOperator) Preference() int {
 	}
 
 	return 0
+}
+
+func supposeFloatSlice(vs []interface{}, f func(i int, f float64)) bool {
+	for i, v := range vs {
+		tmp, ok := v.(float64)
+		if !ok {
+			return false
+		}
+		f(i, tmp)
+	}
+
+	return true
+}
+
+func supposeStringSlice(vs []interface{}, f func(i int, s string)) bool {
+	for i, v := range vs {
+		tmp, ok := v.(string)
+		if !ok {
+			return false
+		}
+		f(i, tmp)
+	}
+
+	return true
 }

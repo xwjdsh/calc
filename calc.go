@@ -6,6 +6,7 @@ import (
 	"go/scanner"
 	"go/token"
 	"strconv"
+	"strings"
 
 	"github.com/xwjdsh/calc/operator"
 	"github.com/xwjdsh/calc/stack"
@@ -28,11 +29,11 @@ func New() *Calculator {
 }
 
 func Eval(input string) (interface{}, error) {
-	return defaultCalculator.Eval(input)
+	return defaultCalculator.EvalWithVars(input, nil)
 }
 
 func (c *Calculator) Eval(input string) (interface{}, error) {
-	return defaultCalculator.EvalWithVars(input, nil)
+	return c.EvalWithVars(input, nil)
 }
 
 func EvalWithVars(str string, m map[string]float64) (interface{}, error) {
@@ -44,7 +45,7 @@ func (c *Calculator) EvalWithVars(input string, m map[string]float64) (interface
 	c.paramStack.Clear()
 
 	var s scanner.Scanner
-	src := []byte(input)
+	src := []byte(strings.ToLower(input))
 	fileSet := token.NewFileSet()
 	s.Init(fileSet.AddFile("", fileSet.Base(), len(src)), src, nil, 0)
 

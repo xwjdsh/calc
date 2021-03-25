@@ -19,7 +19,7 @@ func NewManager() *Manager {
 	}
 
 	// register function type operators
-	for _, c := range []string{SIN, COS, TAN, ABS, OPP} {
+	for _, c := range []string{SIN, COS, TAN, ABS, OPP, SUM, MAX, MIN} {
 		m[c] = newFunctionOperator(c)
 	}
 
