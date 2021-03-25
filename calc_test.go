@@ -11,6 +11,7 @@ func TestEval(t *testing.T) {
 		expressions string
 		expected    interface{}
 		expectErr   bool
+		m           map[string]interface{}
 	}{
 		// general
 		{expressions: "1+2", expected: 3.0},
@@ -38,6 +39,11 @@ func TestEval(t *testing.T) {
 		{expressions: "max('a','n','f')*2", expected: "nn"},
 		{expressions: "min('a','n','f')*2", expected: "aa"},
 		{expressions: "sum(max(-5,1,3,8),min(-5,1,3,8))", expected: 3.0},
+		{expressions: "pow(2,3-1)", expected: 4.0},
+
+		// variable
+		{expressions: "sum(1+$b*$a,$c)", m: map[string]interface{}{"a": 1, "b": uint(2), "c": 3}, expected: 6.0},
+		{expressions: "$a*$b", m: map[string]interface{}{"a": "hello ", "b": 2}, expected: "hello hello "},
 
 		// error conditions
 		{expressions: "2/0", expectErr: true},
@@ -45,10 +51,11 @@ func TestEval(t *testing.T) {
 		{expressions: "3%1.1", expectErr: true},
 		{expressions: `"test"-3`, expectErr: true},
 		{expressions: `"test"/3`, expectErr: true},
+		{expressions: `$a+1`, m: map[string]interface{}{"a": true}, expectErr: true},
 	}
 
 	for _, c := range cases {
-		result, err := Eval(c.expressions)
+		result, err := Eval(c.expressions, c.m)
 		if c.expectErr && err == nil {
 			t.Errorf("expect error, got nil, expressions: %s", c.expressions)
 		}

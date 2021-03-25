@@ -7,5 +7,5 @@ import (
 )
 
 func main() {
-	fmt.Println(calc.Eval("sum(2,3,4)"))
+	fmt.Println(calc.Eval("sum(1+$b*$a,$c)", map[string]interface{}{"a": 1, "b": 2, "c": 3}))
 }

@@ -28,19 +28,11 @@ func New() *Calculator {
 	}
 }
 
-func Eval(input string) (interface{}, error) {
-	return defaultCalculator.EvalWithVars(input, nil)
+func Eval(str string, m map[string]interface{}) (interface{}, error) {
+	return defaultCalculator.Eval(str, m)
 }
 
-func (c *Calculator) Eval(input string) (interface{}, error) {
-	return c.EvalWithVars(input, nil)
-}
-
-func EvalWithVars(str string, m map[string]float64) (interface{}, error) {
-	return defaultCalculator.EvalWithVars(str, m)
-}
-
-func (c *Calculator) EvalWithVars(input string, m map[string]float64) (interface{}, error) {
+func (c *Calculator) Eval(input string, m map[string]interface{}) (interface{}, error) {
 	c.operatorStack.Clear()
 	c.paramStack.Clear()
 
@@ -49,7 +41,14 @@ func (c *Calculator) EvalWithVars(input string, m map[string]float64) (interface
 	fileSet := token.NewFileSet()
 	s.Init(fileSet.AddFile("", fileSet.Base(), len(src)), src, nil, 0)
 
-	var preIsOperator *bool
+	if m == nil {
+		m = map[string]interface{}{}
+	}
+
+	var (
+		preIsOperator *bool
+		parseVariable bool
+	)
 	for {
 		_, tok, lit := s.Scan()
 		if tok == token.EOF {
@@ -59,6 +58,23 @@ func (c *Calculator) EvalWithVars(input string, m map[string]float64) (interface
 
 		op, isOperator := c.getOperator(tok, lit)
 		switch {
+		case parseVariable:
+			vn := lit
+			if vn == "" {
+				vn = tok.String()
+			}
+
+			v, ok := m[vn]
+			if !ok {
+				return nil, fmt.Errorf("calc: unknown variable: %s", vn)
+			}
+
+			if nv, ok := convertAndValidation(v); ok {
+				c.paramStack.Push(nv)
+			} else {
+				return nil, fmt.Errorf("calc: unsupported variable type, name: %s, type: %T", vn, v)
+			}
+			parseVariable = false
 		case tok == token.FLOAT || tok == token.INT:
 			// is number
 			f, err := strconv.ParseFloat(lit, 64)
@@ -85,6 +101,8 @@ func (c *Calculator) EvalWithVars(input string, m map[string]float64) (interface
 				c.operatorStack.Push(op)
 			}
 		case tok == token.SEMICOLON:
+		case lit == "$":
+			parseVariable = true
 		default:
 			return nil, fmt.Errorf("calc: unsupported token: %s", lit)
 		}
@@ -229,4 +247,40 @@ func mustOperator(r interface{}, ok bool) (operator.Operator, bool) {
 	}
 
 	return r.(operator.Operator), true
+}
+
+func convertAndValidation(i interface{}) (interface{}, bool) {
+	var r interface{}
+	switch v := i.(type) {
+	case string:
+		r = v
+	case float64:
+		r = v
+	case uint:
+		r = float64(v)
+	case uint8:
+		r = float64(v)
+	case uint16:
+		r = float64(v)
+	case uint32:
+		r = float64(v)
+	case uint64:
+		r = float64(v)
+	case int:
+		r = float64(v)
+	case int8:
+		r = float64(v)
+	case int16:
+		r = float64(v)
+	case int32:
+		r = float64(v)
+	case int64:
+		r = float64(v)
+	case float32:
+		r = float64(v)
+	default:
+		return nil, false
+	}
+
+	return r, true
 }

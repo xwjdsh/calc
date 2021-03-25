@@ -37,6 +37,7 @@ const (
 	SUM = "sum"
 	MAX = "max"
 	MIN = "min"
+	POW = "pow"
 )
 
 var (
@@ -251,6 +252,15 @@ func (o *functionOperator) Execute(args []interface{}) (interface{}, error) {
 				}
 			}) {
 				return r, nil
+			}
+		case POW:
+			if len(vSli1) == 2 {
+				fs := make([]float64, 2)
+				if supposeFloatSlice(vSli1, func(i int, f float64) {
+					fs[i] = f
+				}) {
+					return math.Pow(fs[0], fs[1]), nil
+				}
 			}
 		}
 	}
