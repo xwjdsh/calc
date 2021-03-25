@@ -5,53 +5,85 @@ import (
 	"strings"
 )
 
+// Type defines operator type.
 type Type int
 
 const (
 	General Type = iota
-	SingleParamFunction
-	MultiParamFunction
+	Bracket
+	Function
 )
 
 const (
-	Add = "+"
-	Sub = "-"
-	Mul = "*"
-	Div = "/"
-	Mod = "%"
+	// general type
+	ADD   = "+"
+	SUB   = "-"
+	MUL   = "*"
+	QUO   = "/"
+	REM   = "%"
+	COMMA = ","
+
+	// bracket type
+	LPAREN = "("
+	RPAREN = ")"
+
+	// function type
+	SIN = "sin"
+	COS = "cos"
+	TAN = "tan"
 )
 
+var (
+	_ Operator = new(generalOperator)
+	_ Operator = new(bracketOperator)
+)
+
+// Operator abstract the function of operators.
 type Operator interface {
-	Code() string
+	// String is the operator token.
+	String() string
+	// Type operator type.
 	Type() Type
+	// ArgsCount returns the required arguments count.
+	ArgsCount() int
+	// Preference represent the operator priority, the bigger the value, the higher the priority.
 	Preference() int
+	// Execute the operator handler
 	Execute(args []interface{}) (interface{}, error)
 }
 
-type GeneralOperator struct {
+type generalOperator struct {
 	code string
 }
 
-func (o *GeneralOperator) Code() string {
+func newGeneralOperator(c string) *generalOperator {
+	return &generalOperator{code: c}
+}
+
+func (o *generalOperator) String() string {
 	return o.code
 }
 
-func (o *GeneralOperator) Type() Type {
+func (o *generalOperator) Type() Type {
 	return General
 }
 
-func (o *GeneralOperator) Preference() int {
+func (o *generalOperator) ArgsCount() int {
+	return 2
+}
+
+func (o *generalOperator) Preference() int {
 	switch o.code {
-	case Add, Sub:
+	case ADD, SUB:
 		return 1
-	case Mul, Div, Mod:
+	case MUL, QUO, REM:
 		return 2
 	}
 
 	return 0
 }
 
-func (o *GeneralOperator) Execute(args []interface{}) (interface{}, error) {
+func (o *generalOperator) Execute(args []interface{}) (interface{}, error) {
 	if len(args) != 2 {
 		return nil, fmt.Errorf("calc/operator: invalid param count for code: %s, expected: 2, actual: %d", o.code, len(args))
 	}
@@ -64,14 +96,14 @@ func (o *GeneralOperator) Execute(args []interface{}) (interface{}, error) {
 	vf2, okf2 := arg2.(float64)
 
 	switch o.code {
-	case Add:
+	case ADD:
 		if oks1 && oks2 {
 			return vs1 + vs2, nil
 		}
 		if okf1 && okf2 {
 			return vf1 + vf2, nil
 		}
-	case Mul:
+	case MUL:
 		if okf1 && okf2 {
 			return vf1 * vf2, nil
 		}
@@ -89,25 +121,49 @@ func (o *GeneralOperator) Execute(args []interface{}) (interface{}, error) {
 				return strings.Repeat(s, i), nil
 			}
 		}
-	case Sub:
+	case SUB:
 		if okf1 && okf2 {
 			return vf1 - vf2, nil
 		}
-	case Div:
+	case QUO:
 		if okf1 && okf2 {
 			if vf2 == 0 {
 				return nil, fmt.Errorf("calc/operator: division by zero")
 			}
 			return vf1 / vf2, nil
 		}
-	case Mod:
+	case REM:
 		if okf1 && okf2 {
 			i1, i2 := int(vf1), int(vf2)
 			if vf1 == float64(i1) && vf2 == float64(i2) {
 				return i1 % i2, nil
 			}
 		}
+	case COMMA:
+		if (oks1 && oks2) || (okf1 && okf2) {
+			return []interface{}{arg1, arg2}, nil
+		}
 	}
 
 	return nil, fmt.Errorf("calc/operator: invalid arguments for code: %s", o.code)
+}
+
+type bracketOperator struct {
+	*generalOperator
+}
+
+func newBracketOperator(c string) *bracketOperator {
+	return &bracketOperator{newGeneralOperator(c)}
+}
+
+func (o *bracketOperator) Type() Type {
+	return Bracket
+}
+
+func (o *bracketOperator) ArgsCount() int {
+	panic(fmt.Sprintf("calc/operator: access ArgsCount for bracket opreator: %s", o.code))
+}
+
+func (o *bracketOperator) Execute(args []interface{}) (interface{}, error) {
+	panic(fmt.Sprintf("calc/operator: access Execute for bracket opreator: %s", o.code))
 }

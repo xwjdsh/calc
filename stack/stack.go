@@ -43,6 +43,10 @@ func (s *Stack) Top() (interface{}, bool) {
 	return s.data[s.p], true
 }
 
+func (s *Stack) Clear() {
+	s.p = -1
+}
+
 func (s *Stack) String() string {
 	return fmt.Sprintf("%v", s.data[:s.p+1])
 }
