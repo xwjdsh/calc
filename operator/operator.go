@@ -180,7 +180,7 @@ func (o *bracketOperator) ArgsCount() int {
 	panic(fmt.Sprintf("calc/operator: access ArgsCount for bracket opreator: %s", o.code))
 }
 
-func (o *bracketOperator) Execute(args []interface{}) (interface{}, error) {
+func (o *bracketOperator) Execute([]interface{}) (interface{}, error) {
 	panic(fmt.Sprintf("calc/operator: access Execute for bracket opreator: %s", o.code))
 }
 
