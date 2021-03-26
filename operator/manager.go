@@ -28,17 +28,13 @@ func NewManager() *Manager {
 	}
 }
 
-// Contains returns the given code if available.
-func (m *Manager) Contains(code string) bool {
-	return m.GetByString(code) != nil
-}
-
 // Get returns operator by special code, it will be nil if not found.
-func (m *Manager) Get(t token) Operator {
-	return m.m[t]
+func (m *Manager) Get(t token) (Operator, bool) {
+	op, ok := m.m[t]
+	return op, ok
 }
 
 // GetByString same as Get, but accept string.
-func (m *Manager) GetByString(code string) Operator {
+func (m *Manager) GetByString(code string) (Operator, bool) {
 	return m.Get(token(code))
 }

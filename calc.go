@@ -5,10 +5,9 @@ package calc
 import (
 	"errors"
 	"fmt"
-	"go/scanner"
-	"go/token"
 	"strconv"
 	"strings"
+	"text/scanner"
 
 	"github.com/xwjdsh/calc/operator"
 	"github.com/xwjdsh/calc/stack"
@@ -51,9 +50,9 @@ func (c *Calculator) Eval(input string, m map[string]interface{}) (interface{}, 
 	c.paramStack.Clear()
 
 	var s scanner.Scanner
-	src := []byte(strings.ToLower(input))
-	fileSet := token.NewFileSet()
-	s.Init(fileSet.AddFile("", fileSet.Base(), len(src)), src, nil, 0)
+	s.Init(strings.NewReader(strings.ToLower(input)))
+	// ignore scanner error message
+	s.Error = func(s *scanner.Scanner, msg string) {}
 
 	if m == nil {
 		m = map[string]interface{}{}
@@ -64,44 +63,41 @@ func (c *Calculator) Eval(input string, m map[string]interface{}) (interface{}, 
 		parseVariable bool
 	)
 	for {
-		_, tok, lit := s.Scan()
-		if tok == token.EOF {
+		tok := s.Scan()
+		text := s.TokenText()
+		if tok == scanner.EOF {
 			break
 		}
-		//fmt.Printf("%s\t%s\n", tok, lit)
+
+		//fmt.Printf("%s\t%s\n", scanner.TokenString(tok), text)
 		//fmt.Println("operator: ", c.operatorStack.String())
 		//fmt.Println("params: ", c.paramStack.String())
 
-		op, isOperator := c.getOperator(tok, lit)
+		op, isOperator := c.opManager.GetByString(text)
 		switch {
 		case parseVariable:
-			vn := lit
-			if vn == "" {
-				vn = tok.String()
-			}
-
-			v, ok := m[vn]
+			v, ok := m[text]
 			if !ok {
-				return nil, fmt.Errorf("calc: unknown variable: %s", vn)
+				return nil, fmt.Errorf("calc: unknown variable: %s", text)
 			}
 
 			if nv, ok := convertAndValidation(v); ok {
 				c.paramStack.Push(nv)
 			} else {
-				return nil, fmt.Errorf("calc: unsupported variable type, name: %s, type: %T", vn, v)
+				return nil, fmt.Errorf("calc: unsupported variable type, name: %s, type: %T", text, v)
 			}
 			parseVariable = false
-		case tok == token.FLOAT || tok == token.INT:
+		case tok == scanner.Float || tok == scanner.Int:
 			// is number
-			f, err := strconv.ParseFloat(lit, 64)
+			f, err := strconv.ParseFloat(text, 64)
 			if err != nil {
 				return nil, err
 			}
 			c.paramStack.Push(f)
-		case tok == token.CHAR || tok == token.STRING:
+		case tok == scanner.Char || tok == scanner.String:
 			// is string
 			// remove surrounding double or single quotes
-			c.paramStack.Push(lit[1 : len(lit)-1])
+			c.paramStack.Push(text[1 : len(text)-1])
 		case isOperator:
 			// is operator
 			switch op.Type() {
@@ -116,11 +112,10 @@ func (c *Calculator) Eval(input string, m map[string]interface{}) (interface{}, 
 			case operator.Function:
 				c.operatorStack.Push(op)
 			}
-		case tok == token.SEMICOLON:
-		case lit == "$":
+		case text == "$":
 			parseVariable = true
 		default:
-			return nil, fmt.Errorf("calc: unsupported token: %s", lit)
+			return nil, fmt.Errorf("calc: unsupported token: '%s'", text)
 		}
 
 		preIsOperator = &isOperator
@@ -255,18 +250,6 @@ func (c *Calculator) executeLastWithCondition(conditionFunc func(lastOp operator
 	}
 
 	return true, nil
-}
-
-func (c *Calculator) getOperator(tok token.Token, lit string) (operator.Operator, bool) {
-	if c.opManager.Contains(tok.String()) || c.opManager.Contains(lit) {
-		op := c.opManager.GetByString(tok.String())
-		if op == nil {
-			op = c.opManager.GetByString(lit)
-		}
-		return op, true
-	}
-
-	return nil, false
 }
 
 func mustOperator(r interface{}, ok bool) (operator.Operator, bool) {
