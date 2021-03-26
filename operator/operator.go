@@ -15,29 +15,39 @@ const (
 	Function
 )
 
+type token string
+
+func (t token) String() string {
+	return string(t)
+}
+
+func (t token) Token() token {
+	return t
+}
+
 const (
 	// general type
-	ADD   = "+"
-	SUB   = "-"
-	MUL   = "*"
-	QUO   = "/"
-	REM   = "%"
-	COMMA = ","
+	ADD   token = "+"
+	SUB   token = "-"
+	MUL   token = "*"
+	QUO   token = "/"
+	REM   token = "%"
+	COMMA token = ","
 
 	// bracket type
-	LPAREN = "("
-	RPAREN = ")"
+	LPAREN token = "("
+	RPAREN token = ")"
 
 	// function type
-	SIN = "sin"
-	COS = "cos"
-	TAN = "tan"
-	ABS = "abs"
-	OPP = "opp" // opposite number
-	SUM = "sum"
-	MAX = "max"
-	MIN = "min"
-	POW = "pow"
+	SIN token = "sin"
+	COS token = "cos"
+	TAN token = "tan"
+	ABS token = "abs"
+	OPP token = "opp" // opposite number
+	SUM token = "sum"
+	MAX token = "max"
+	MIN token = "min"
+	POW token = "pow"
 )
 
 var (
@@ -48,28 +58,33 @@ var (
 
 // Operator abstract the function of operators.
 type Operator interface {
-	// String is the operator token.
-	String() string
+	// Token is the operator token.
+	Token() token
 	// Type operator type.
 	Type() Type
-	// ArgsCount returns the required arguments count.
-	ArgsCount() int
 	// Preference represent the operator priority, the bigger the value, the higher the priority.
 	Preference() int
+}
+
+var (
+	_ ExecutableOperator = new(generalOperator)
+	_ ExecutableOperator = new(functionOperator)
+)
+
+type ExecutableOperator interface {
+	Operator
+	// ArgsCount returns the required arguments count.
+	ArgsCount() int
 	// Execute the operator handler
 	Execute(args []interface{}) (interface{}, error)
 }
 
 type generalOperator struct {
-	code string
+	token
 }
 
-func newGeneralOperator(c string) *generalOperator {
-	return &generalOperator{code: c}
-}
-
-func (o *generalOperator) String() string {
-	return o.code
+func newGeneralOperator(t token) *generalOperator {
+	return &generalOperator{token: t}
 }
 
 func (o *generalOperator) Type() Type {
@@ -81,7 +96,7 @@ func (o *generalOperator) ArgsCount() int {
 }
 
 func (o *generalOperator) Preference() int {
-	switch o.code {
+	switch o.token {
 	case ADD, SUB:
 		return 1
 	case MUL, QUO, REM:
@@ -93,7 +108,7 @@ func (o *generalOperator) Preference() int {
 
 func (o *generalOperator) Execute(args []interface{}) (interface{}, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("calc/operator: invalid param count for code: %s, expected: 2, actual: %d", o.code, len(args))
+		return nil, fmt.Errorf("calc/operator: invalid param count for code: %s, expected: 2, actual: %d", o.token, len(args))
 	}
 
 	arg1, arg2 := args[0], args[1]
@@ -103,7 +118,7 @@ func (o *generalOperator) Execute(args []interface{}) (interface{}, error) {
 	vf1, okf1 := arg1.(float64)
 	vf2, okf2 := arg2.(float64)
 
-	switch o.code {
+	switch o.token {
 	case ADD:
 		if oks1 && oks2 {
 			return vs1 + vs2, nil
@@ -157,15 +172,15 @@ func (o *generalOperator) Execute(args []interface{}) (interface{}, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("calc/operator: invalid arguments for code: %s", o.code)
+	return nil, fmt.Errorf("calc/operator: invalid arguments for code: %s", o.token)
 }
 
 type bracketOperator struct {
-	*generalOperator
+	token
 }
 
-func newBracketOperator(c string) *bracketOperator {
-	return &bracketOperator{newGeneralOperator(c)}
+func newBracketOperator(t token) *bracketOperator {
+	return &bracketOperator{token: t}
 }
 
 func (o *bracketOperator) Type() Type {
@@ -176,20 +191,12 @@ func (o *bracketOperator) Preference() int {
 	return -1
 }
 
-func (o *bracketOperator) ArgsCount() int {
-	panic(fmt.Sprintf("calc/operator: access ArgsCount for bracket opreator: %s", o.code))
-}
-
-func (o *bracketOperator) Execute([]interface{}) (interface{}, error) {
-	panic(fmt.Sprintf("calc/operator: access Execute for bracket opreator: %s", o.code))
-}
-
 type functionOperator struct {
-	*generalOperator
+	token
 }
 
-func newFunctionOperator(c string) *functionOperator {
-	return &functionOperator{newGeneralOperator(c)}
+func newFunctionOperator(t token) *functionOperator {
+	return &functionOperator{token: t}
 }
 
 func (o *functionOperator) Type() Type {
@@ -202,13 +209,13 @@ func (o *functionOperator) ArgsCount() int {
 
 func (o *functionOperator) Execute(args []interface{}) (interface{}, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("calc/operator: invalid param count for code: %s, expected: 1, actual: %d", o.code, len(args))
+		return nil, fmt.Errorf("calc/operator: invalid param count for code: %s, expected: 1, actual: %d", o.token, len(args))
 	}
 
 	arg1 := args[0]
 	vf1, okf1 := arg1.(float64)
 	originalFunc := func(f float64) float64 { return f }
-	floatOpMap := map[string]func(f float64) float64{
+	floatOpMap := map[token]func(f float64) float64{
 		SIN: math.Sin,
 		COS: math.Cos,
 		TAN: math.Tan,
@@ -219,13 +226,13 @@ func (o *functionOperator) Execute(args []interface{}) (interface{}, error) {
 		MIN: originalFunc,
 	}
 
-	if okf1 && floatOpMap[o.code] != nil {
-		return floatOpMap[o.code](vf1), nil
+	if okf1 && floatOpMap[o.token] != nil {
+		return floatOpMap[o.token](vf1), nil
 	}
 
 	vSli1, okSli1 := arg1.([]interface{})
 	if okSli1 && len(vSli1) > 0 {
-		switch o.code {
+		switch o.token {
 		case SUM:
 			if sum := 0.0; supposeFloatSlice(vSli1, func(_ int, f float64) { sum += f }) {
 				return sum, nil
@@ -233,7 +240,7 @@ func (o *functionOperator) Execute(args []interface{}) (interface{}, error) {
 		case MAX, MIN:
 			eff := func(f1, f2 float64) bool { return f1 > f2 }
 			esf := func(s1, s2 string) bool { return s1 > s2 }
-			if o.code == MIN {
+			if o.token == MIN {
 				eff = func(f1, f2 float64) bool { return f1 < f2 }
 				esf = func(s1, s2 string) bool { return s1 < s2 }
 			}
@@ -265,11 +272,11 @@ func (o *functionOperator) Execute(args []interface{}) (interface{}, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("calc/operator: invalid arguments for code: %s", o.code)
+	return nil, fmt.Errorf("calc/operator: invalid arguments for code: %s", o.token)
 }
 
 func (o *functionOperator) Preference() int {
-	if o.code == OPP {
+	if o.token == OPP {
 		return 2
 	}
 

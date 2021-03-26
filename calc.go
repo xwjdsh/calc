@@ -55,6 +55,8 @@ func (c *Calculator) Eval(input string, m map[string]interface{}) (interface{}, 
 			break
 		}
 		//fmt.Printf("%s\t%s\n", tok, lit)
+		//fmt.Println("operator: ", c.operatorStack.String())
+		//fmt.Println("params: ", c.paramStack.String())
 
 		op, isOperator := c.getOperator(tok, lit)
 		switch {
@@ -124,12 +126,12 @@ func (c *Calculator) Eval(input string, m map[string]interface{}) (interface{}, 
 
 func (c *Calculator) handleGeneralOperator(op operator.Operator, preIsOperator *bool) error {
 	// need handle `-` specially, convert to opposite number function
-	if op.String() == operator.SUB && (preIsOperator == nil || *preIsOperator) {
+	if op.Token() == operator.SUB && (preIsOperator == nil || *preIsOperator) {
 		op = c.opManager.Get(operator.OPP)
 	}
 
 	for {
-		ok, err := c.executeLastWithCondition(func(lastOp operator.Operator) (bool, error) {
+		ok, err := c.executeLastWithCondition(func(lastOp operator.ExecutableOperator) (bool, error) {
 			return op.Preference() <= lastOp.Preference(), nil
 		})
 		if err != nil {
@@ -145,14 +147,12 @@ func (c *Calculator) handleGeneralOperator(op operator.Operator, preIsOperator *
 }
 
 func (c *Calculator) handleBracketOperator(op operator.Operator) error {
-	switch op.String() {
+	switch op.Token() {
 	case operator.LPAREN:
 		c.operatorStack.Push(op)
 	case operator.RPAREN:
 		for {
-			ok, err := c.executeLastWithCondition(func(lastOp operator.Operator) (bool, error) {
-				return lastOp.String() != operator.LPAREN, nil
-			})
+			ok, err := c.executeLastWithCondition(nil)
 			if err != nil {
 				return err
 			}
@@ -167,7 +167,7 @@ func (c *Calculator) handleBracketOperator(op operator.Operator) error {
 		}
 
 		// calculation if pre operator is function type
-		if _, err := c.executeLastWithCondition(func(lastOp operator.Operator) (bool, error) {
+		if _, err := c.executeLastWithCondition(func(lastOp operator.ExecutableOperator) (bool, error) {
 			return lastOp.Type() == operator.Function, nil
 		}); err != nil {
 			return err
@@ -184,19 +184,24 @@ func (c *Calculator) executeAll() error {
 			return nil
 		}
 
-		if err := c.execute(op); err != nil {
+		eop, ok := op.(operator.ExecutableOperator)
+		if !ok {
+			return fmt.Errorf("calc: unexecutable operator: %s", op.Token())
+		}
+
+		if err := c.execute(eop); err != nil {
 			return err
 		}
 	}
 }
 
-func (c *Calculator) execute(op operator.Operator) error {
+func (c *Calculator) execute(op operator.ExecutableOperator) error {
 	count := op.ArgsCount()
 	args := make([]interface{}, count)
 	for i := count - 1; i >= 0; i-- {
 		arg, ok := c.paramStack.Pop()
 		if !ok {
-			return fmt.Errorf("calc: no enough params for operator: %s", op.String())
+			return fmt.Errorf("calc: no enough params for operator: %s", op.Token())
 		}
 
 		args[i] = arg
@@ -211,18 +216,25 @@ func (c *Calculator) execute(op operator.Operator) error {
 	return nil
 }
 
-func (c *Calculator) executeLastWithCondition(conditionFunc func(lastOp operator.Operator) (bool, error)) (bool, error) {
+func (c *Calculator) executeLastWithCondition(conditionFunc func(lastOp operator.ExecutableOperator) (bool, error)) (bool, error) {
 	preOp, ok := mustOperator(c.operatorStack.Top())
 	if !ok {
 		return false, nil
 	}
-	ok, err := conditionFunc(preOp)
-	if !ok || err != nil {
-		return ok, err
+	eop, ok := preOp.(operator.ExecutableOperator)
+	if !ok {
+		return false, nil
+	}
+
+	if conditionFunc != nil {
+		ok, err := conditionFunc(eop)
+		if !ok || err != nil {
+			return ok, err
+		}
 	}
 
 	preOp, _ = mustOperator(c.operatorStack.Pop())
-	if err := c.execute(preOp); err != nil {
+	if err := c.execute(eop); err != nil {
 		return false, err
 	}
 
@@ -231,9 +243,9 @@ func (c *Calculator) executeLastWithCondition(conditionFunc func(lastOp operator
 
 func (c *Calculator) getOperator(tok token.Token, lit string) (operator.Operator, bool) {
 	if c.opManager.Contains(tok.String()) || c.opManager.Contains(lit) {
-		op := c.opManager.Get(tok.String())
+		op := c.opManager.GetByString(tok.String())
 		if op == nil {
-			op = c.opManager.Get(lit)
+			op = c.opManager.GetByString(lit)
 		}
 		return op, true
 	}

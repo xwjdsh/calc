@@ -8,7 +8,7 @@ import (
 
 func TestGeneralOperator(t *testing.T) {
 	cases := []struct {
-		code      string
+		code      token
 		args      []interface{}
 		expected  interface{}
 		expectErr bool
@@ -43,7 +43,7 @@ func TestGeneralOperator(t *testing.T) {
 
 func TestFunctionOperator(t *testing.T) {
 	cases := []struct {
-		code      string
+		code      token
 		args      []interface{}
 		expected  interface{}
 		expectErr bool
