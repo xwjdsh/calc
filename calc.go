@@ -233,7 +233,7 @@ func (c *Calculator) executeLastWithCondition(conditionFunc func(lastOp operator
 		}
 	}
 
-	preOp, _ = mustOperator(c.operatorStack.Pop())
+	mustOperator(c.operatorStack.Pop())
 	if err := c.execute(eop); err != nil {
 		return false, err
 	}
