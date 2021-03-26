@@ -14,6 +14,7 @@ func TestEval(t *testing.T) {
 		m           map[string]interface{}
 	}{
 		// general
+		{expressions: "--1", expected: 1.0},
 		{expressions: "1+2", expected: 3.0},
 		{expressions: "-1+2", expected: 1.0},
 		{expressions: "10%3/2", expected: 0.5},

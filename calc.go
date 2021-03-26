@@ -137,8 +137,14 @@ func (c *Calculator) handleGeneralOperator(op operator.Operator, preIsOperator *
 	// need handle `-` specially, convert to opposite number function
 	// preIsOperator == nil, e.g. `-1+2`
 	// *preIsOperator is true, e.g. `2+ -1` or `(-1-2)`
-	if op.Token() == operator.SUB && (preIsOperator == nil || *preIsOperator) {
-		op = c.opManager.Get(operator.OPP)
+	if op.Token() == operator.SUB {
+		if preIsOperator == nil {
+			// `-1` -> `0-1`
+			c.paramStack.Push(0.0)
+		} else if *preIsOperator {
+			// `1--1` -> `1-opp(1)`
+			op, _ = c.opManager.Get(operator.OPP)
+		}
 	}
 
 	for {
