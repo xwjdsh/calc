@@ -1,3 +1,6 @@
+// Package operator represents the operator in expression,
+// include three types, general, bracket and function.
+
 package operator
 
 import (
@@ -56,7 +59,7 @@ var (
 	_ Operator = new(functionOperator)
 )
 
-// Operator abstract the function of operators.
+// Operator abstract the methods to fetch operator basic info.
 type Operator interface {
 	// Token is the operator token.
 	Token() token
@@ -71,6 +74,7 @@ var (
 	_ ExecutableOperator = new(functionOperator)
 )
 
+// ExecutableOperator abstract the methods to execute operator.
 type ExecutableOperator interface {
 	Operator
 	// ArgsCount returns the required arguments count.
@@ -111,6 +115,7 @@ func (o *generalOperator) Execute(args []interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("calc/operator: invalid param count for code: %s, expected: 2, actual: %d", o.token, len(args))
 	}
 
+	// TODO could be simplification there
 	arg1, arg2 := args[0], args[1]
 	vs1, oks1 := arg1.(string)
 	vs2, oks2 := arg2.(string)

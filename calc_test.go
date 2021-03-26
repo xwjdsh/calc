@@ -29,6 +29,7 @@ func TestEval(t *testing.T) {
 		{expressions: "(1*(2+1))*((3+1)*4)", expected: 48.0},
 
 		// function
+		{expressions: "1+sin(cos(5))*2", expected: 1 + math.Sin(math.Cos(5))*2},
 		{expressions: "aBs(-1)", expected: 1.0},
 		{expressions: "3*sin(3+2*3)+3*4", expected: 3*math.Sin(3+2*3) + 3*4},
 		{expressions: "1+abs(-5)*2", expected: 11.0},

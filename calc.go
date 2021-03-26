@@ -1,3 +1,5 @@
+// Package calc implements the logic of expression calculation by Eval or obj.Eval.
+
 package calc
 
 import (
@@ -14,12 +16,14 @@ import (
 
 var defaultCalculator = New()
 
+// Calculator wraps the logic of executing expressions.
 type Calculator struct {
 	paramStack    *stack.Stack
 	operatorStack *stack.Stack
 	opManager     *operator.Manager
 }
 
+// New returns a new Calculator instance.
 func New() *Calculator {
 	return &Calculator{
 		paramStack:    stack.New(),
@@ -28,6 +32,16 @@ func New() *Calculator {
 	}
 }
 
+// Must cause panic if err is not nil.
+func Must(r interface{}, err error) interface{} {
+	if err != nil {
+		panic(err)
+	}
+
+	return r
+}
+
+// Eval calculates given expressions.
 func Eval(str string, m map[string]interface{}) (interface{}, error) {
 	return defaultCalculator.Eval(str, m)
 }
@@ -126,6 +140,8 @@ func (c *Calculator) Eval(input string, m map[string]interface{}) (interface{}, 
 
 func (c *Calculator) handleGeneralOperator(op operator.Operator, preIsOperator *bool) error {
 	// need handle `-` specially, convert to opposite number function
+	// preIsOperator == nil, e.g. `-1+2`
+	// *preIsOperator is true, e.g. `2+ -1` or `(-1-2)`
 	if op.Token() == operator.SUB && (preIsOperator == nil || *preIsOperator) {
 		op = c.opManager.Get(operator.OPP)
 	}
@@ -162,7 +178,7 @@ func (c *Calculator) handleBracketOperator(op operator.Operator) error {
 		}
 
 		// pop `(`
-		if _, ok := mustOperator(c.operatorStack.Pop()); !ok {
+		if _, ok := c.operatorStack.Pop(); !ok {
 			return errors.New("calc: can not find matching parenthesis")
 		}
 
