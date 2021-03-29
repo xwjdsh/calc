@@ -2,9 +2,7 @@
 
 package stack
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // Stack the data structure stack.
 type Stack struct {
@@ -41,6 +39,11 @@ func (s *Stack) Push(i interface{}) {
 	s.data = append(s.data, i)
 }
 
+func (s *Stack) AddFirst(i interface{}) {
+	s.p++
+	s.data = append([]interface{}{i}, s.data[:s.p]...)
+}
+
 // Top returns the latest added element.
 func (s *Stack) Top() (interface{}, bool) {
 	if s.p < 0 {
@@ -50,12 +53,21 @@ func (s *Stack) Top() (interface{}, bool) {
 	return s.data[s.p], true
 }
 
+func (s *Stack) All() []interface{} {
+	if s.p < 0 {
+		return []interface{}{}
+	}
+
+	return s.data[:s.p+1]
+}
+
 // Clear flushes stack.
 func (s *Stack) Clear() {
+	s.data = []interface{}{}
 	s.p = -1
 }
 
 // String returns the data in string format.
 func (s *Stack) String() string {
-	return fmt.Sprintf("%v", s.data[:s.p+1])
+	return fmt.Sprintf("%+v", s.data[:s.p+1])
 }
